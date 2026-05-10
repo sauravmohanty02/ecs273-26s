@@ -2,19 +2,13 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import * as d3 from 'd3';
 import { SECTOR_LABEL } from '../data/stocks';
 
-type Row = {
-  ticker: string;
-  x: number;
-  y: number;
-  sector: string;
-};
+type Row = { ticker: string; x: number; y: number; sector: string };
 
 type Props = {
   selected: string;
   onSelect: (ticker: string) => void;
 };
 
-// Distinct colors for each sector — d3 schemeTableau10 keeps them perceptually separable.
 const SECTOR_ORDER = [
   'Energy',
   'Industrials',
@@ -33,32 +27,23 @@ export default function TSNEScatter({ selected, onSelect }: Props) {
   const wrapperRef = useRef<HTMLDivElement | null>(null);
   const svgRef = useRef<SVGSVGElement | null>(null);
   const [data, setData] = useState<Row[] | null>(null);
-  const [error, setError] = useState<string | null>(null);
   const [size, setSize] = useState<{ w: number; h: number }>({ w: 480, h: 320 });
 
-  // Load tsne.csv.
   useEffect(() => {
-    const url = `${import.meta.env.BASE_URL}data/tsne.csv`;
-    d3.csv(url, (d) => ({
+    d3.csv(`${import.meta.env.BASE_URL}data/tsne.csv`, (d) => ({
       ticker: d.ticker as string,
       x: +d.x!,
       y: +d.y!,
       sector: d.sector as string,
-    }))
-      .then((rows) => setData(rows as Row[]))
-      .catch((err) => setError(`Failed to load tsne.csv: ${err.message}`));
+    })).then((rows) => setData(rows as Row[]));
   }, []);
 
-  // Track wrapper size.
   useEffect(() => {
     const el = wrapperRef.current;
     if (!el) return;
     const ro = new ResizeObserver(() => {
       const rect = el.getBoundingClientRect();
-      setSize({
-        w: Math.max(320, rect.width),
-        h: Math.max(240, rect.height),
-      });
+      setSize({ w: Math.max(320, rect.width), h: Math.max(240, rect.height) });
     });
     ro.observe(el);
     return () => ro.disconnect();
@@ -70,7 +55,6 @@ export default function TSNEScatter({ selected, onSelect }: Props) {
     return SECTOR_ORDER.filter((s) => set.has(s));
   }, [data]);
 
-  // Render the scatter plot.
   useEffect(() => {
     if (!data || !svgRef.current) return;
 
@@ -89,50 +73,32 @@ export default function TSNEScatter({ selected, onSelect }: Props) {
     const padX = (xExtent[1] - xExtent[0]) * 0.08 || 1;
     const padY = (yExtent[1] - yExtent[0]) * 0.08 || 1;
 
-    const x = d3.scaleLinear()
-      .domain([xExtent[0] - padX, xExtent[1] + padX])
-      .range([0, innerW]);
-    const y = d3.scaleLinear()
-      .domain([yExtent[0] - padY, yExtent[1] + padY])
-      .range([innerH, 0]);
+    const x = d3.scaleLinear().domain([xExtent[0] - padX, xExtent[1] + padX]).range([0, innerW]);
+    const y = d3.scaleLinear().domain([yExtent[0] - padY, yExtent[1] + padY]).range([innerH, 0]);
 
-    // Clip to the plot area so points stay inside while zooming.
-    svg.append('defs')
-      .append('clipPath')
-      .attr('id', 'tsne-clip')
-      .append('rect')
-      .attr('width', innerW)
-      .attr('height', innerH);
+    svg.append('defs').append('clipPath').attr('id', 'tsne-clip')
+      .append('rect').attr('width', innerW).attr('height', innerH);
 
-    const g = svg.append('g')
-      .attr('transform', `translate(${margin.left},${margin.top})`);
+    const g = svg.append('g').attr('transform', `translate(${margin.left},${margin.top})`);
 
-    // Axes (rebuilt on zoom).
     const xAxisG = g.append('g').attr('transform', `translate(0,${innerH})`);
     const yAxisG = g.append('g');
 
-    // Axis labels.
     g.append('text')
       .attr('x', innerW / 2).attr('y', innerH + 30)
-      .attr('text-anchor', 'middle')
-      .attr('fill', '#374151').style('font-size', '11px')
+      .attr('text-anchor', 'middle').attr('fill', '#374151').style('font-size', '11px')
       .text('t-SNE Dimension 1');
     g.append('text')
       .attr('transform', 'rotate(-90)')
       .attr('x', -innerH / 2).attr('y', -34)
-      .attr('text-anchor', 'middle')
-      .attr('fill', '#374151').style('font-size', '11px')
+      .attr('text-anchor', 'middle').attr('fill', '#374151').style('font-size', '11px')
       .text('t-SNE Dimension 2');
 
-    // Plot area with clipping.
     const plot = g.append('g').attr('clip-path', 'url(#tsne-clip)');
+    const pointsG = plot.append('g');
 
-    const pointsG = plot.append('g').attr('class', 'points');
-
-    // Draw circles + labels for selected.
     const drawPoints = (xs: d3.ScaleLinear<number, number>, ys: d3.ScaleLinear<number, number>) => {
-      const sel = pointsG.selectAll<SVGCircleElement, Row>('circle.point')
-        .data(data, (d) => d.ticker);
+      const sel = pointsG.selectAll<SVGCircleElement, Row>('circle.point').data(data, (d) => d.ticker);
 
       sel.join(
         (enter) =>
@@ -143,26 +109,20 @@ export default function TSNEScatter({ selected, onSelect }: Props) {
             .attr('cy', (d) => ys(d.y))
             .attr('fill', (d) => colorScale(d.sector) as string)
             .attr('stroke', (d) => (d.ticker === selected ? '#0f172a' : 'white'))
-            .attr('stroke-width', (d) => (d.ticker === selected ? 2.5 : 1.25))
+            .attr('stroke-width', (d) => (d.ticker === selected ? 2 : 1))
             .style('cursor', 'pointer')
-            .on('click', (_e, d) => onSelect(d.ticker))
-            .append('title')
-            .text((d) => `${d.ticker} — ${SECTOR_LABEL[d.sector] ?? d.sector}`),
+            .on('click', (_e, d) => onSelect(d.ticker)),
         (update) =>
           update
             .attr('cx', (d) => xs(d.x))
             .attr('cy', (d) => ys(d.y))
             .attr('r', (d) => (d.ticker === selected ? 10 : 6))
             .attr('stroke', (d) => (d.ticker === selected ? '#0f172a' : 'white'))
-            .attr('stroke-width', (d) => (d.ticker === selected ? 2.5 : 1.25))
+            .attr('stroke-width', (d) => (d.ticker === selected ? 2 : 1))
       );
 
-      // Label: only for the selected stock (spec requirement). Non-selected
-      // tickers are revealed via hover tooltip / native <title>, keeping the
-      // plot uncluttered when sectors cluster tightly.
       const onlySelected = data.filter((d) => d.ticker === selected);
-      const labels = pointsG.selectAll<SVGTextElement, Row>('text.label')
-        .data(onlySelected, (d) => d.ticker);
+      const labels = pointsG.selectAll<SVGTextElement, Row>('text.label').data(onlySelected, (d) => d.ticker);
       labels.join(
         (enter) =>
           enter.append('text')
@@ -197,10 +157,8 @@ export default function TSNEScatter({ selected, onSelect }: Props) {
     renderAxes(x, y);
     drawPoints(x, y);
 
-    // Zoom behavior: wheel + drag to pan + double-click to reset.
     const zoom = d3.zoom<SVGSVGElement, unknown>()
       .scaleExtent([0.5, 20])
-      .translateExtent([[-innerW, -innerH], [innerW * 2, innerH * 2]])
       .on('zoom', (event) => {
         const t = event.transform;
         const xs = t.rescaleX(x);
@@ -209,49 +167,31 @@ export default function TSNEScatter({ selected, onSelect }: Props) {
         drawPoints(xs, ys);
       });
 
-    // Transparent capture rect over the plot area for zoom interactions.
     g.append('rect')
-      .attr('width', innerW)
-      .attr('height', innerH)
+      .attr('width', innerW).attr('height', innerH)
       .attr('fill', 'transparent')
       .style('pointer-events', 'all')
       .lower();
 
-    svg.call(zoom).on('dblclick.zoom', () => {
-      svg.transition().duration(300).call(zoom.transform, d3.zoomIdentity);
-    });
+    svg.call(zoom);
   }, [data, size, selected, onSelect]);
 
   return (
     <div className="w-full h-full flex flex-col">
-      <div className="flex items-center justify-between mb-2">
-        <div className="text-sm text-slate-700">
-          <span className="font-semibold">t-SNE Projection</span>
-          <span className="ml-2 text-slate-500">{data ? `${data.length} stocks` : 'loading…'}</span>
-        </div>
-        <div className="text-xs text-slate-500 italic">
-          Scroll to zoom • Drag to pan • Double-click to reset
-        </div>
-      </div>
+      <div className="text-sm font-semibold text-slate-700 mb-2">t-SNE Projection</div>
 
-      <div ref={wrapperRef} className="flex-1 min-h-[220px] border border-slate-200 rounded bg-white relative">
-        {error ? (
-          <div className="p-4 text-sm text-red-600">{error}</div>
-        ) : !data ? (
-          <div className="p-4 text-sm text-slate-500">Loading t-SNE data…</div>
+      <div ref={wrapperRef} className="flex-1 min-h-[220px] border border-slate-200 rounded bg-white">
+        {!data ? (
+          <div className="p-4 text-sm text-slate-500">Loading…</div>
         ) : (
           <svg ref={svgRef} className="block" />
         )}
       </div>
 
-      {/* Legend */}
       <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-slate-600">
         {sectorsPresent.map((s) => (
           <div key={s} className="flex items-center gap-1.5">
-            <span
-              className="inline-block w-2.5 h-2.5 rounded-full"
-              style={{ background: colorScale(s) as string }}
-            />
+            <span className="inline-block w-2.5 h-2.5 rounded-full" style={{ background: colorScale(s) as string }} />
             <span>{SECTOR_LABEL[s] ?? s}</span>
           </div>
         ))}
