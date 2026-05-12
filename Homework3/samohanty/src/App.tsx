@@ -6,8 +6,7 @@ import NewsList from './component/NewsList';
 
 export default function App() {
   const [selected, setSelected] = useState<string>('AAPL');
-  // Bumped each time selection changes via the dropdown so NewsList can
-  // auto-expand the most recent article (bonus linking).
+  
   const [expandCounter, setExpandCounter] = useState<number>(0);
 
   const handleSelect = (ticker: string) => {

@@ -1,5 +1,5 @@
 // List of 20 stock tickers used across this assignment.
-// Order mirrors the sectors used in HW2.
+
 export const STOCK_TICKERS: string[] = [
   'XOM', 'CVX', 'HAL',           // Energy
   'MMM', 'CAT', 'DAL',           // Industrials
